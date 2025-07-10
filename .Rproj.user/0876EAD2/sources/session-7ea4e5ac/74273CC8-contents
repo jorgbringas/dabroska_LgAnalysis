@@ -1,0 +1,163 @@
+---
+title: "First steps in Quarto"
+subtitle: "Reproducing the descriptive statistics of Dąbrowska's (2019) study"
+author: "Elen Le Foll"
+date: last-modified
+format:
+  html:
+    number-sections: true
+    embed-resources: true
+    fig-dpi: 300
+---
+
+## Introduction
+
+In this document, we attempt to reproduce the descriptive statistics published in:
+
+-   Dąbrowska, Ewa. 2019. Experience, Aptitude, and Individual Differences in Linguistic Attainment: A Comparison of Native and Nonnative Speakers. *Language Learning* 69(S1). 72-100. <https://doi.org/10.1111/lang.12323>.
+
+We further visualise the data and carry out additional statistical tests to learn more about doing data analysis in R.
+
+```{r}
+#| label: setup
+#| include: false
+
+# List of packages necessary in this Quarto document:
+packages <- c("here", "kableExtra", "tidyverse")
+
+# Function to install the packages that are not yet installed:
+installed_packages <- packages %in%               rownames(installed.packages()) 
+if (any(installed_packages == FALSE)) { install.packages(packages[!installed_packages]) }
+
+# Function to load the packages without printing any messages:
+invisible(lapply(packages, library, character.only = TRUE))
+```
+
+The shortcut to insert a new code chunk is Option + Cmd/Ctrl + i.
+
+```{r}
+
+```
+
+Code chunk options begin with `#|`. Here are are some of the most useful ones:
+
+-   `eval: false` prevents code from being evaluated. And obviously, if the code is not run, no code outputs will be generated.
+
+-   `include: false` runs the code, but does not show the
+    code or its outputs in the rendered document. This option is useful for
+    code chunks that are not informative to the readers of your document.
+
+-   `echo: false` prevents the code, but not the results
+    from appearing in the rendered document. This option is useful when you
+    want to present the results of your analyses to people who are not
+    interested in the underlying code.
+
+-   `message: false` or `warning: false` prevents messages or warnings from appearing in the rendered document.
+
+## Data
+
+We first import the authors' original datasets (Dąbrowska 2019: Appendix S4), which are comma-separated files that can be downloaded from the IRIS database.
+
+```{r}
+#| label: import-data
+#| include: false
+  
+L1.data <- read.csv(file = here("data", "L1_data.csv"))
+L2.data <- read.csv(file = here("data", "L2_data.csv"))
+```
+
+## Reproduction
+
+We begin by reproducing the descriptive statistics about the participants (Dąbrowska 2019: 5-6):
+
+> ### Method
+>
+> #### [Participants]{.underline}
+>
+> Ninety native speakers (42 male and 48 female) and 67 nonnative speakers of English (21 male and 46 female) were recruited through personal contacts, church and social clubs, and advertisements in local newspapers. Participants were told that the purpose of the study was to examine individual differences in native and nonnative speakers’ knowledge of English and whether these differences are related to their linguistic experience and abilities. All participants signed a written consent form before the research commenced.
+>
+> The L1 participants were all born and raised in the United Kingdom and were selected to ensure a range of ages, occupations, and educational backgrounds. The age range was from 17 to 65 years (*M* = 38, *SD* = 16). Twenty-two percent of the participants held manual jobs, 24% held clerical positions, and 28% had professional-level jobs or were studying for a degree; the remaining 26% were occupationally inactive (i.e., unemployed, retired, or homemakers). In terms of education, participants’ backgrounds ranged from no formal qualifications to Ph.D., with corresponding differences in the number of years spent in full-time education (from 10 to 21; *M* = 14, *SD* = 2). Six participants reported a working knowledge of another language; the rest described themselves as monolinguals.
+
+## Descriptive statistics about the participants
+
+`{r} nrow(L1.data)` native speakers and `{r} nrow(L2.data)` nonnative speakers of English were recruited through personal contacts, church and social clubs, and advertisements in local newspapers.
+
+```{r}
+#| label: L1-gender
+#| include: false
+
+L1.males <- L1.data |>
+  filter(Gender == "M") |>
+  count()
+
+L1.females <- L1.data |>
+  filter(Gender == "F") |>
+  count()
+```
+
+`{r} nrow(L1.data)` native speakers (`{r} L1.males` male and `{r} L1.females` female) and `{r} nrow(L2.data)` nonnative speakers of English were recruited through personal contacts, church and social clubs, and advertisements in local newspapers.
+
+## Tables in Quarto
+
+@tbl-L1-languages is a very nice table. As you can see in the previous sentence, chunk labels that begin with `tbl-` can be used to add cross-references to tables.
+
+```{r}
+#| label: tbl-L1-languages
+#| tbl-cap: "Example of a {kable} table"
+#| echo: false
+
+L1.data |> 
+  count(OtherLgs, 
+        sort = TRUE) |> 
+  kable(col.names = c("Other languages", "n"))
+```
+
+## Plots in Quarto
+
+### Hypothesis 1 and base `R` plots
+
+We hypothesise that L1 speakers' passive English vocabulary knowledge is correlated with their age.
+
+-   Null hypothesis (H0): English L1 speakers' passive English vocabulary knowledge is *not* correlated with their age.
+
+@fig-baseR-scatter is a base `R` plot. As you can see in the previous sentence, chunk labels that begin with `fig-` can be used to add cross-references to figures.
+
+```{r}
+#| label: fig-baseR-scatter
+#| fig-cap: Plotting L2 participants' lexical proficiency in English against their age using base R
+#| echo: false
+
+plot(L1.data$Age, L1.data$VocabR,
+         xlab = "Age (in years)",
+         ylab = "Vocabulary test scores")
+```
+
+### Hypothesis 2 and {ggplot} plots
+
+Our second hypothesis is that L2 speakers' passive English vocabulary knowledge is correlated with how long they have lived in the UK.
+
+-   Null hypothesis (H0):
+
+Now we generate a scatterplot using the {ggplot2} library from the {tidyverse}. We did not cover this section in class on 4 June, but our next double session on 25 June will be all about data visualisation using {ggplot2} and inferential statistics.
+
+```{r}
+#| label: fig-ggplot2-scatter
+#| fig-cap: "Plotting the relationship between L2 speakers' lexical proficiency in English and their length of residence in the UK using ggplot2"
+
+ggplot(data = L2.data,
+       mapping = aes(x = LoR, 
+                     y = VocabR)) +
+  geom_point() +
+  labs(y = "Vocabulary test scores",
+       x = "Length of residence in the UK (in years)")
+```
+
+Task: Write a couple of sentences interpreting the plot.
+
+::: callout-tip
+## Going further 🌈
+
+Complete [Chapter 13](https://elenlefoll.github.io/RstatsTextbook/13_LiterateProgramming.html#sec-PublishingFormats) of the textbook to find out what else Quarto can do!
+
+Fun fact: Did you know that the entire textbook is written in Quarto? You can view the source code here: https://github.com/elenlefoll/RstatsTextbook/. 🕵
+:::

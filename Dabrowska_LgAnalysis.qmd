@@ -1,0 +1,324 @@
+---
+title: "Reproducibility Study: Language Analytic Ability"
+subtitle: "A Reproduction of Findings from Dąbrowska (2019)"
+author: "Hannah, Beyhan, Jorge"
+format: 
+  html:
+    theme: cosmo
+    toc: true
+    number-sections: true
+    embed-resources: true
+    fig-dpi: 300
+editor: 
+  markdown: 
+    wrap: 72
+---
+
+# Introduction
+
+This report details a reproducibility study of one specific instrument
+from Ewa Dąbrowska's (2019) research: the test for **Language Analytic
+Ability**. The analysis examines the instrument itself, its application
+in comparing native (L1) and nonnative (L2) speakers, and the
+statistical and visual reproduction of the paper's key findings using R.
+
+The analysis is based on the data and claims presented in:
+
+-   Dąbrowska, Ewa. 2019. Experience, Aptitude, and Individual
+    Differences in Linguistic Attainment: A Comparison of Native and
+    Nonnative Speakers. *Language Learning* 69(S1). 72-100.
+    <https://doi.org/10.1111/lang.12323>.
+
+```{r}
+#| label: setup
+#| include: false
+#| 
+## Setup
+# This chunk loads all necessary libraries and prepares the data for analysis.
+# It is hidden in the final output but is essential for the code to run.
+
+# Load libraries
+library(tidyverse)
+library(knitr)
+library(effectsize)
+library(here)
+
+# Load the datasets from local files
+l1_data <- read_csv(file = here("data", "L1_data.csv"))
+l2_data <- read_csv(file = here("data", "L2_data.csv"))
+
+# convert to character type
+l1_data <- l1_data |> mutate(Participant = as.character(Participant))
+l2_data <- l2_data |> mutate(Participant = as.character(Participant))
+
+# Add a 'Group' identifier to each dataset
+l1_data$Group <- "L1"
+l2_data$Group <- "L2"
+
+# Combine the datasets and select only the columns needed for this analysis
+combined_data <- bind_rows(l1_data, l2_data) |>
+  select(Group, LgAnalysis, Vocab)
+```
+
+# The Testing Instrument: Language Analytic Ability
+
+Before diving into the data, it's important to understand the tool used
+to measure Language Analytic Ability.
+
+-   *Who developed it and when?*
+
+    The test used in Dabrowska's study is the Language Analysis subtest
+    of the Pimsleur Language Aptitude Battery (PLAB), developed by
+    Pimsleur, Reed, and Stansfield in 2004.
+
+-   *For what purpose?*
+
+    Language Analytic Ability is the ability to infer linguistic rules
+    and generalizations, and therefore an important skill in regards to
+    grammar.
+
+-   *How it works:*
+
+    Participants are presented with some vocabulary and sentences in an
+    unknown language. From these, they were supposed to predict the form
+    of a new sentence.
+
+![Example](images/examplePLAB.png)
+
+<https://lltf.net/aptitude-tests/language-aptitude-tests/pimsleur-language-aptitude-battery/plab-sample-items/plab-part-4/>
+
+## Descriptive Statistics
+
+The first step in the reproduction is the calculation of descriptive
+statistics for the `LgAnalysis` scores for both L1 and L2 groups. This
+verifies that the dataset used matches the sample characteristics of the
+original study.
+
+```{r}
+#| label: descriptive-stats
+#| echo: false
+
+# Calculate descriptive statistics using dplyr
+descriptive_stats <- combined_data |> 
+  group_by(Group) |> 
+  summarise(
+    Count = n(),
+    Mean = mean(LgAnalysis, na.rm = TRUE),
+    `Std. Dev.` = sd(LgAnalysis, na.rm = TRUE),
+    Min = min(LgAnalysis, na.rm = TRUE),
+    Max = max(LgAnalysis, na.rm = TRUE),
+    Range = Max - Min
+  )
+
+# Display the results in a clean, formatted table
+kable(descriptive_stats, 
+      caption = "Descriptive Statistics for Language Analytic Ability Scores",
+      digits = 2)
+```
+
+*Interpretation:* The table shows that the L2 group (Mean = 9.64)
+exhibits a higher mean score on the Language Analytic Ability test than
+the L1 group (Mean = 7.59). The standard deviation is also larger for
+the L2 group, indicating slightly more variability in their scores.The
+range of scores is similar for both groups (L1 = 15, L2 = 14).
+
+# Statistical Analysis
+
+The analysis now moves beyond description to test whether the observed
+differences and relationships are statistically significant.
+
+## Testing the Difference Between Groups (t-test)
+
+An independent samples t-test is performed to determine if the
+difference in mean `LgAnalysis` scores between the L1 and L2 groups is
+statistically significant.
+
+```{r}
+#| label: t-test
+#| echo: false
+
+# Perform an independent samples t-test
+t_test_result <- t.test(LgAnalysis ~ Group, data = combined_data)
+
+# Print the full result of the t-test
+print(t_test_result)
+```
+
+*Interpretation:* The t-test yields a p-value of
+`r round(t_test_result$p.value, 4)`. As this value is well below the
+conventional significance level of α = 0.05, the null hypothesis is
+rejected. This provides strong statistical evidence that the higher mean
+score of the L2 group is not due to random chance.
+
+As this value is well below the conventional significance level of α =
+0.05, the null hypothesis is rejected.
+
+## Testing the Relationship with Vocabulary (Correlation)
+
+Dąbrowska (2019) reports that `LgAnalysis` is a significant predictor of
+vocabulary for L2 learners but not for L1 learners in her regression
+models (p. 87). This claim is tested here using separate bivariate
+correlation tests for each group.
+
+### *L2 Group Correlation:*
+
+```{r}
+#| label: cor-l2
+#| echo: false
+
+# Filter for L2 group and run correlation test
+cor_l2 <- cor.test(~ LgAnalysis + Vocab, data = filter(combined_data, Group == "L2"))
+print(cor_l2)
+```
+
+*Interpretation (L2):* For the L2 group, the analysis reveals a
+moderate, positive correlation (r = `r cor_l2$estimate`). The p-value (p
+= `r round(cor_l2$p.value, 4)`) is highly significant. This successfully
+reproduces the paper's key finding: for nonnative speakers, higher
+language analytic ability is associated with a larger vocabulary.
+
+
+### *L1 Group Correlation:*
+
+```{r}
+#| label: cor-l1
+#| echo: false
+
+# Set a high penalty for scientific notation to force standard decimals and avoid p = 2.586e-06
+options(scipen = 999)
+
+# Filter for L1 group and run correlation test
+cor_l1 <- cor.test(~ LgAnalysis + Vocab, data = filter(combined_data, Group == "L1"))
+print(cor_l1)
+```
+
+*Interpretation (L1):* For the L1 group, the data show a strong positive
+correlation (r =`r cor_l1$estimate`). This relationship is also highly statistically significant (p < .001). This finding is of particular interest as it appears to diverge from the conclusion in the original paper, where a relationship between`LgAnalysis`and vocabulary size was not found to be a significant factor for L1 speakers in the final model (p. 87).
+
+# Data Visualization
+
+## Visualizing the Group Difference
+
+A boxplot provides a clear visual comparison of the score distributions
+for the two groups.
+
+```{r}
+#| label: fig-boxplot
+#| fig-cap: "Distribution of Language Analytic Ability Scores for L1 and L2 Speakers."
+#| echo: false
+
+# set.seed() makes the plot be the same every time we run this chunk since their horizontal placement is by default intentionally randomized
+set.seed(123) 
+# if not used, we get random points each time we run it
+
+# ggplot
+ggplot(combined_data, aes(x = Group, y = LgAnalysis, fill = Group)) +
+  geom_boxplot(alpha = 0.7) +
+  geom_jitter(width = 0.1, alpha = 0.4) +
+  labs(title = "Language Analytic Ability Scores: L1 vs. L2 Speakers",
+       x = "Participant Group",
+       y = "Language Analytic Ability Score") +
+  theme_minimal() +
+  scale_fill_manual(values = c("L1" = "#0072B2", "L2" = "#D55E00"))
+```
+
+*Interpretation:* This boxplot clearly shows that the entire
+distribution for the L2 group (orange) is shifted upwards compared to
+the L1 group (blue). The median, upper, and lower quartiles are all
+higher, visually confirming the significant difference we found with the
+t-test.
+
+## Visualizing the Correlation with Vocabulary
+
+A scatterplot is used to visualize the relationship between language
+analytic ability and vocabulary scores for both groups.
+
+```{r}
+#| label: fig-scatterplot-simultaneously
+#| fig-cap: "Relationship Between Language Analytic Ability and Vocabulary Scores, simultaneously."
+#| echo: false
+
+ggplot(combined_data, aes(x = LgAnalysis, y = Vocab, color = Group)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, aes(linetype = Group)) + # Add regression lines
+  labs(title = "Language Analytic Ability and Vocabulary Scores",
+       x = "Language Analytic Ability Score",
+       y = "Vocabulary Score") +
+  theme_minimal() +
+  scale_color_manual(values = c("L1" = "#0072B2", "L2" = "#D55E00"))
+```
+
+```{r}
+#| label: fig-scatterplot-groups
+#| fig-cap: "Relationship Between Language Analytic Ability and Vocabulary Scores, separated by group."
+#| echo: false
+
+ggplot(combined_data, aes(x = LgAnalysis, y = Vocab, color = Group)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~ Group) +
+  labs(
+    title = "Language Analytic Ability and Vocabulary Scores",
+    x = "Language Analytic Ability Score",
+    y = "Vocabulary Score"
+  ) +
+  theme_bw() +
+  scale_color_brewer(palette = "Set1")
+```
+
+**Interpretation:** The scatterplots reveal a clear, positive
+relationship for both groups(an upward-sloping line). The trend is
+evident not just for the L2 group, but also for the L1 group, visually
+confirming that the correlation is present and significant in both
+samples.
+
+# Conclusion & Critical Analysis
+
+This reproduction study successfully corroborates several key findings
+from Dąbrowska (2019) regarding Language Analytic Ability, while also
+highlighting an important nuance in the data that warrants discussion.
+
+-   **Corroboration of Key Findings:** The analysis confirms two of the
+    paper's central points. First, for L2 speakers, there is a
+    **significant positive correlation** between their language analytic
+    ability (`LgAnalysis`) and their vocabulary scores. This aligns
+    perfectly with the author's regression analysis, which found
+    `LgAnalysis` to be a significant predictor of vocabulary, accounting
+    for 14% of the variance (**Table 6, p. 87**). Second, the direct
+    t-test on the raw scores shows that L2 speakers **significantly
+    outperform** L1 speakers on the Language Analysis test (p = 0.002).
+    While Dąbrowska does not report this specific t-test, this finding
+    is consistent with the broader patterns discussed in the paper.
+
+-   **A Point of Divergence:** The most interesting finding of this
+    reproduction is the direct, significant correlation between
+    `LgAnalysis` and `Vocab` for the **L1 group** (r = 0.47, p \< .001).
+    This appears to contradict the paper's conclusion, where the author
+    states, **"\[...\] it is not clear why such a relationship is not
+    observed in native speakers" (Dąbrowska, 2019, p. 87)**.
+
+-   **Explaining the Discrepancy (Correlation vs. Regression):** This
+    apparent contradiction is not an error but a reflection of differing
+    analytical methods. Dąbrowska's conclusion stems from an *Ordinary
+    Least Squares (OLS) multiple regression model* (**p. 85**), which
+    assesses the *unique* predictive power of a variable after
+    accounting for other factors. The model for L1 vocabulary (**Table
+    5, p. 87**) includes print exposure (ART), nonverbal IQ (Blocks),
+    and Age as significant predictors, but `LgAnalysis` does not appear.
+    As Dąbrowska herself speculates, the effect of language analytic
+    ability is likely **"\[...\] masked by the stronger effects of
+    nonverbal IQ, which \[...\] is moderately strongly associated with
+    it" (p. 87)**.
+
+The findings in this reproduction study clarifie that while `LgAnalysis`
+may not be a significant predictor for L1 vocabulary *in the presence of
+other variables*, a simple, direct relationship between the two does
+indeed exist in the data.
+
+### R Implementation
+
+This analysis was conducted in R. Key packages included the
+**`tidyverse`** suite (**`dplyr`** & **`here`** for data manipulation
+and **`ggplot2`** for visualization) and **`knitr`** for report
+generation. Statistical inference was performed using base R functions,
+specifically `t.test()` and `cor.test()`.

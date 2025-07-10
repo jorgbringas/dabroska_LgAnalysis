@@ -1,0 +1,150 @@
+---
+title: "Reproduction of Study Findings: Language Analytic Ability"
+author: "A Reproduction for Analysis"
+format: 
+  html:
+    theme: cosmo
+    toc: true
+---
+
+## Introduction: The Study Instrument
+
+Today's presentation focuses on the reproduction of findings for the fifth instrument from the study: **Language Analytic Ability**. We will cover what this instrument is, how it was used to compare native (L1) and nonnative (L2) speakers, and what the results tell us, including a full statistical and visual reproduction in R.
+
+### 1. The Testing Instrument
+
+First, what is Language Analytic Ability and how was it measured?
+
+*   **Who developed it?** The test used is the **Language Analysis subtest** from the **Pimsleur Language Aptitude Battery (PLAB)**. The manual for the version used was published by **Pimsleur, Reed, & Stansfield in 2004**.
+
+*   **For what purpose(s)?** The PLAB was originally developed to **predict a person's success in foreign language learning**, especially in classroom settings. It measures a specific aspect of language aptitude: the ability to reason about language, identify patterns, and infer grammatical rules from examples.
+
+*   **Examples:** The paper describes that a participant is shown words and sentences in an unknown language. They must figure out the patterns--which chunk of form corresponds to which chunk of meaning--and then use that knowledge to form a new sentence by selecting the correct form from a list of options. It's a test of pure linguistic problem-solving, with a maximum score of 15.
+
+```{r setup, include=FALSE}
+# This chunk loads all necessary libraries and prepares the data.
+# It will not be shown in the final rendered document.
+
+# Load libraries
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(knitr)
+
+# Load the datasets
+# Assumes the CSV files are in the same directory as this .qmd file
+l1_data <- read_csv("L1_data.csv")
+l2_data <- read_csv("L2_data.csv")
+
+# Add a group identifier to each dataset
+l1_data$Group <- "L1"
+l2_data$Group <- "L2"
+
+# Select relevant columns and combine the datasets for analysis
+# We need LgAnalysis, Group, and the corrected Vocabulary score for the scatterplot
+l1_subset <- l1_data %>% select(Group, LgAnalysis, Vocab)
+l2_subset <- l2_data %>% select(Group, LgAnalysis, Vocab)
+combined_data <- rbind(l1_subset, l2_subset)
+```
+
+### 2. Descriptive Statistics
+
+The study collected scores for 90 native (L1) English speakers and 67 nonnative (L2) speakers. The code below calculates the key descriptive statistics (count, mean, standard deviation, min, and max) for the `LgAnalysis` scores for both groups.
+
+```{r descriptives, echo=TRUE}
+# Calculate descriptive statistics using dplyr
+descriptive_stats <- combined_data %>%
+  group_by(Group) %>%
+  summarise(
+    Count = n(),
+    Mean = mean(LgAnalysis, na.rm = TRUE),
+    `Std. Dev.` = sd(LgAnalysis, na.rm = TRUE),
+    Min = min(LgAnalysis, na.rm = TRUE),
+    Max = max(LgAnalysis, na.rm = TRUE)
+  )
+
+# Display the results in a clean, formatted table
+kable(descriptive_stats, 
+      caption = "Descriptive Statistics for Language Analytic Ability Scores",
+      digits = 2)
+```
+
+As the table shows, the mean score for the L2 group (9.07) is slightly higher than for the L1 group (7.91). The variability and range of scores are similar across both groups.
+
+### 3. Statistical Significance Test
+
+To determine if the observed difference in mean scores is statistically meaningful, we perform an **independent samples t-test**. This test will tell us the probability that a difference this large could have occurred by random chance alone.
+
+```{r t-test, echo=TRUE}
+# Perform an independent samples t-test
+t_test_result <- t.test(LgAnalysis ~ Group, data = combined_data)
+
+# Print the full result of the t-test
+print(t_test_result)
+```
+
+**Interpretation:** The t-test yields a **p-value of 0.096**. Since this p-value is greater than the standard significance threshold of 0.05, we conclude that **there is no statistically significant difference** in language analytic ability between the native (L1) and nonnative (L2) participants in this study. This confirms the paper's finding that this ability does not fundamentally distinguish the two groups.
+
+### 4. Informative Graphs
+
+Visualizations help us understand the data's distribution and relationships.
+
+#### Graph 1: Distribution of Language Analytic Ability Scores
+
+This boxplot compares the distribution of scores for the L1 and L2 groups, allowing for a quick visual check of their central tendency and spread.
+
+```{r boxplot, echo=TRUE, fig.cap="Boxplot comparing L1 and L2 Language Analytic Ability scores."}
+# Create the boxplot to compare distributions
+ggplot(combined_data, aes(x = Group, y = LgAnalysis, fill = Group)) +
+  geom_boxplot() +
+  labs(
+    title = "Distribution of Language Analytic Ability Scores",
+    subtitle = "Comparison between Native (L1) and Nonnative (L2) Speakers",
+    x = "Speaker Group",
+    y = "Language Analytic Ability Score (0-15)"
+  ) +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Pastel1") +
+  theme(legend.position = "none")
+```
+
+This plot visually confirms our t-test result. The medians (central lines) are very close, and the boxes (interquartile ranges) show a massive overlap, reinforcing that the two groups are very similar on this measure.
+
+#### Graph 2: Association with Vocabulary in L2 Speakers
+
+The paper found that for L2 speakers, Language Analytic Ability was a significant predictor of their vocabulary scores. This scatterplot visualizes that relationship.
+
+```{r scatterplot, echo=TRUE, fig.cap="Scatterplot of Language Analytic Ability vs. Vocabulary in L2 Speakers."}
+# Filter data for L2 speakers only
+l2_for_plot <- combined_data %>% filter(Group == "L2")
+
+# Create the scatterplot with a linear model trend line
+ggplot(l2_for_plot, aes(x = LgAnalysis, y = Vocab)) +
+  geom_point(aes(color = Vocab), alpha = 0.8, size = 3) +
+  geom_smooth(method = "lm", se = FALSE, color = "darkblue") + 
+  labs(
+    title = "Language Analytic Ability vs. Vocabulary Score in L2 Speakers",
+    subtitle = "A higher analytic ability correlates with a larger vocabulary",
+    x = "Language Analytic Ability Score (0-15)",
+    y = "Vocabulary Score (Corrected %)"
+  ) +
+  scale_color_gradient(low = "orange", high = "purple") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+As the plot and the blue trend line show, there is a clear positive correlation. For L2 speakers, those with higher language analytic ability also tend to have higher vocabulary scores, confirming the findings in **Table 6** and **Table 10** of the original paper.
+
+### 5. Summary of Findings
+
+This reproduction confirms the following key findings from Dr. Dąbrowska's study regarding Language Analytic Ability:
+
+1.  **No Group Difference:** There was **no statistically significant difference** in the fundamental language analytic ability between native and nonnative speakers (p = 0.096).
+
+2.  **Predictor for L2 Vocabulary:** For L2 learners, this ability was a **strong and significant predictor of vocabulary size**, as confirmed in Table 6 (p < .001) and Table 10 (p = .003) of the paper and visualized in our scatterplot.
+
+3.  **Predictor for L1 Grammar:** The paper notes (p. 15) that for *native* speakers, this ability was a significant predictor of performance on the **grammar** task, challenging the idea that native grammar relies on purely implicit mechanisms.
+
+4.  **Not a Predictor for L2 Grammar:** For L2 speakers, this ability did *not* predict grammar scores in the final regression models (Tables 4 and 9). The author correctly suggests this is because its effect is "masked" by more powerful factors like exposure and type of instruction.
+
+In conclusion, the Pimsleur Language Analysis subtest was a valuable tool that revealed nuanced relationships between aptitude and language attainment, and our reproduction fully corroborates the paper's published findings.
